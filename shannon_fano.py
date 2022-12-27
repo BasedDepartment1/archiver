@@ -1,6 +1,19 @@
 from collections import Counter
 
 
+def decode(encoded: str, coding_table: dict):
+    decoded = bytearray()
+    code = ""
+    for char in encoded:
+        code += char
+        for char, char_code in coding_table.items():
+            if code == char_code:
+                decoded.append(char)
+                code = ""
+                break
+    return decoded
+
+
 class ShannonFano:
     def __init__(self, bytes):
         self.bytes = bytes
@@ -47,16 +60,3 @@ class ShannonFano:
         for char in self.bytes:
             encoded += self.codes[char]
         return encoded
-
-    @staticmethod
-    def decode(encoded: str, coding_table: dict):
-        decoded = bytearray()
-        code = ""
-        for char in encoded:
-            code += char
-            for char, char_code in coding_table.items():
-                if code == char_code:
-                    decoded.append(char)
-                    code = ""
-                    break
-        return decoded
