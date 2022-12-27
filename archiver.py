@@ -9,6 +9,7 @@ from shannon_fano import ShannonFano
 
 @dataclass
 class File:
+    __slots__ = ["name", "decoding_table", "encoded", "hash"]
     name: str
     decoding_table: dict
     encoded: bytes
