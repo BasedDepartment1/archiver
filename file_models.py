@@ -1,13 +1,26 @@
 from __future__ import annotations
 
+import pickle
+import logging
+
 from dataclasses import dataclass
 from typing import List
 
 
+def load_from_pickle(path: str):
+    try:
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        logging.error(f'Файл {path} не найден.')
+        raise
+    except pickle.UnpicklingError:
+        logging.error(f'Файл {path} поврежден.')
+        raise
+
+
 @dataclass
 class File:
-    __slots__ = ["name", "decoding_table",
-                 "encoded", "hash", "encoded_size"]
     name: str
     decoding_table: dict
     encoded: bytes
@@ -17,7 +30,11 @@ class File:
 
 @dataclass
 class Directory:
-    __slots__ = ["name", "files", "directories"]
     name: str
     files: List[File]
     directories: List[Directory]
+
+
+@dataclass
+class Meta:
+    timestamp: str
