@@ -16,6 +16,40 @@ class File:
     hash: str
 
 
+def decode(input_path: str, output_path: str = None) -> None:
+    file = _load_file(input_path)
+    encoded = ''.join([bin(byte)[2:].zfill(8) for byte in file.encoded])
+    decoded_bytes = ShannonFano.decode(encoded, file.decoding_table)
+
+    path = file.name if output_path is None \
+        else f'{output_path}/{file.name}'
+
+    try:
+        with open(path, 'wb') as f:
+            f.write(decoded_bytes)
+    except FileNotFoundError:
+        logging.error(f'Путь {output_path} не найден.')
+        raise FileNotFoundError
+
+    logging.info('Распаковка завершена.')
+    logging.info(f'Конечный путь: {path}')
+
+    if hashlib.md5(decoded_bytes).hexdigest() != file.hash:
+        logging.warning('Файл поврежден.')
+
+
+def _load_file(path: str) -> File:
+    try:
+        with open(path, 'rb') as f:
+            return pickle.load(f)
+    except FileNotFoundError:
+        logging.error(f'Файл {path} не найден.')
+        raise FileNotFoundError
+    except pickle.UnpicklingError:
+        logging.error(f'Файл {path} поврежден.')
+        raise pickle.UnpicklingError
+
+
 class Archiver:
     def __init__(self, path: str) -> None:
         self.name = os.path.basename(path)
@@ -32,7 +66,7 @@ class Archiver:
 
         self.shannon_fano = ShannonFano(self.bytes)
 
-    def __get_file(self) -> File:
+    def _get_file(self) -> File:
         encoded = self.shannon_fano.encode()
         encoded_bytes = bytes()
         for i in range(0, len(encoded), 8):
@@ -43,7 +77,7 @@ class Archiver:
                     hash=self.hash)
 
     def encode(self, output_path: str = None) -> None:
-        file = self.__get_file()
+        file = self._get_file()
 
         path = f'{file.name}.sf' if output_path is None \
             else f'{output_path}/{file.name}.sf'
@@ -57,42 +91,8 @@ class Archiver:
                      f'{100 * (1 - encoded_file_size // self.file_size)}%')
         logging.info(f'Конечный путь: {path}')
 
-    @staticmethod
-    def __load_file(path: str) -> File:
-        try:
-            with open(path, 'rb') as f:
-                return pickle.load(f)
-        except FileNotFoundError:
-            logging.error(f'Файл {path} не найден.')
-            raise FileNotFoundError
-        except pickle.UnpicklingError:
-            logging.error(f'Файл {path} поврежден.')
-            raise pickle.UnpicklingError
-
-    @staticmethod
-    def decode(input_path: str, output_path: str = None) -> None:
-        file = Archiver.__load_file(input_path)
-        encoded = ''.join([bin(byte)[2:].zfill(8) for byte in file.encoded])
-        decoded_bytes = ShannonFano.decode(encoded, file.decoding_table)
-
-        path = file.name if output_path is None \
-            else f'{output_path}/{file.name}'
-
-        try:
-            with open(path, 'wb') as f:
-                f.write(decoded_bytes)
-        except FileNotFoundError:
-            logging.error(f'Путь {output_path} не найден.')
-            raise FileNotFoundError
-
-        logging.info('Распаковка завершена.')
-        logging.info(f'Конечный путь: {path}')
-
-        if hashlib.md5(decoded_bytes).hexdigest() != file.hash:
-            logging.warning('Файл поврежден.')
-
 
 if __name__ == '__main__':
     # archiver = Archiver('ArseniyFrog.png')
     # archiver.encode()
-    Archiver.decode('ArseniyFrog.png.sf', 'decoded')
+    decode('ArseniyFrog.png.sf', 'decoded')
