@@ -9,16 +9,21 @@ from shannon_fano import ShannonFano
 
 @dataclass
 class File:
-    __slots__ = ["name", "decoding_table", "encoded", "hash"]
+    __slots__ = ["name", "decoding_table",
+                 "encoded", "hash", "encoded_size"]
     name: str
     decoding_table: dict
     encoded: bytes
     hash: str
+    encoded_size: int
 
 
 def decode(input_path: str, output_path: str = None) -> None:
     file = _load_file(input_path)
     encoded = ''.join([bin(byte)[2:].zfill(8) for byte in file.encoded])
+    last = encoded[-8:]
+    last = last[-(file.encoded_size % 8):]
+    encoded = encoded[:-8] + last
     decoded_bytes = ShannonFano.decode(encoded, file.decoding_table)
 
     path = file.name if output_path is None \
@@ -74,7 +79,8 @@ class Archiver:
         return File(name=self.name,
                     decoding_table=self.shannon_fano.codes,
                     encoded=encoded_bytes,
-                    hash=self.hash)
+                    hash=self.hash,
+                    encoded_size=len(encoded))
 
     def encode(self, output_path: str = None) -> None:
         file = self._get_file()
@@ -93,6 +99,6 @@ class Archiver:
 
 
 if __name__ == '__main__':
-    # archiver = Archiver('ArseniyFrog.png')
-    # archiver.encode()
-    decode('ArseniyFrog.png.sf', 'decoded')
+    archiver = Archiver('test.txt')
+    archiver.encode()
+    decode('test.txt.sf')
