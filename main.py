@@ -3,7 +3,7 @@ import click
 
 @click.command()
 @click.argument('files', nargs=-1)
-@click.option('--encode', 'mode', case_sensitive=False, flag_value='encode', default=True)
+@click.option('--encode', 'mode', case_sensitive=False, flag_value='encode', default=True)  # noqa: E501
 @click.option('--decode', 'mode', case_sensitive=False, flag_value='decode')
 @click.option('--checksum', '-c', is_flag=True, help='Print checksums')
 @click.option('--stats', '-s', is_flag=True, help='Print statistics')
