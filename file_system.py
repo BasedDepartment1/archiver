@@ -25,35 +25,4 @@ def get_files(*paths: str) -> List:
 
 
 def get_file(path: str) -> File:
-    return FileSerializer(path).file
-
-
-class FileSerializer:
-    def __init__(self, path: str) -> None:
-        self.name = os.path.basename(path)
-        self.file_size = os.path.getsize(path)
-
-        try:
-            with open(path, 'rb') as file:
-                self.bytes = file.read()
-        except FileNotFoundError:
-            logging.error(f'Файл {path} не найден.')
-            raise FileNotFoundError
-
-        self.hash = hashlib.md5(self.bytes).hexdigest()
-
-        self.shannon_fano = ShannonFano(self.bytes)
-
-    @property
-    def file(self) -> File:
-        encoded = self.shannon_fano.encode()
-        encoded_bytes = bytes()
-        for i in range(0, len(encoded), 8):
-            encoded_bytes += int(encoded[i:i + 8], 2).to_bytes(1, 'big')
-        return File(
-            name=self.name,
-            decoding_table=self.shannon_fano.codes,
-            encoded=encoded_bytes,
-            hash=self.hash,
-            encoded_size=len(encoded)
-        )
+    return File.from_file(path)

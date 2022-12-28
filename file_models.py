@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import pickle
 import logging
+import hashlib
+import os
 
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from typing import List, Optional
+
+from shannon_fano import ShannonFano
 
 
 def load_from_pickle(path: str) -> MetaWrapper:
@@ -28,6 +32,33 @@ class File:
     encoded: bytes
     hash: str
     encoded_size: int
+
+    @classmethod
+    def from_file(cls, path: str):
+        name = os.path.basename(path)
+
+        try:
+            with open(path, 'rb') as file:
+                bts = file.read()
+        except FileNotFoundError:
+            logging.error(f'Файл {path} не найден.')
+            raise FileNotFoundError
+
+        hash_code = hashlib.md5(bts).hexdigest()
+        shannon_fano = ShannonFano(bts)
+
+        encoded = shannon_fano.encode()
+        encoded_bytes = bytes()
+        for i in range(0, len(encoded), 8):
+            encoded_bytes += int(encoded[i:i + 8], 2).to_bytes(1, 'big')
+
+        return cls(
+            name=name,
+            decoding_table=shannon_fano.codes,
+            encoded=encoded_bytes,
+            hash=hash_code,
+            encoded_size=len(encoded)
+        )
 
 
 @dataclass
