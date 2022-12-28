@@ -1,104 +1,104 @@
+from __future__ import annotations
+
 import hashlib
-import logging
 import pickle
 import os
-from dataclasses import dataclass
 
-from shannon_fano import ShannonFano
+from typing import Optional
 
+import shannon_fano
 
-@dataclass
-class File:
-    __slots__ = ["name", "decoding_table",
-                 "encoded", "hash", "encoded_size"]
-    name: str
-    decoding_table: dict
-    encoded: bytes
-    hash: str
-    encoded_size: int
+from file_models import File, Directory, MetaWrapper, load_from_pickle
+from file_system import get_directory, get_files
 
 
-def decode(input_path: str, output_path: str = None) -> None:
-    file = _load_file(input_path)
+def decode_file(file: File, output_path: Optional[str] = None) -> None:
     encoded = ''.join([bin(byte)[2:].zfill(8) for byte in file.encoded])
     last = encoded[-8:]
     last = last[-(file.encoded_size % 8):]
     encoded = encoded[:-8] + last
-    decoded_bytes = ShannonFano.decode(encoded, file.decoding_table)
+    decoded_bytes = shannon_fano.decode(encoded, file.decoding_table)
 
-    path = file.name if output_path is None \
-        else f'{output_path}/{file.name}'
+    path = (file.name if output_path is None
+            else f'{output_path}/{file.name}')
 
     try:
         with open(path, 'wb') as f:
             f.write(decoded_bytes)
     except FileNotFoundError:
-        logging.error(f'Путь {output_path} не найден.')
-        raise FileNotFoundError
-
-    logging.info('Распаковка завершена.')
-    logging.info(f'Конечный путь: {path}')
+        raise
 
     if hashlib.md5(decoded_bytes).hexdigest() != file.hash:
-        logging.warning('Файл поврежден.')
+        raise OSError(f'Файл {file.name} поврежден.')
 
 
-def _load_file(path: str) -> File:
-    try:
-        with open(path, 'rb') as f:
-            return pickle.load(f)
-    except FileNotFoundError:
-        logging.error(f'Файл {path} не найден.')
-        raise FileNotFoundError
-    except pickle.UnpicklingError:
-        logging.error(f'Файл {path} поврежден.')
-        raise pickle.UnpicklingError
+class Decoder:
+    def __init__(
+            self,
+            input_path: str,
+            output_path: Optional[str] = None
+    ) -> None:
+        self.input_path = input_path
+        self.output_path = output_path
+        self.meta = load_from_pickle(input_path)
+        self.archived_data = self.meta.file_model
+
+    def decode(self) -> None:
+        if self.meta.password_hash:
+            password = input('Введите пароль: ')
+            if (hashlib.sha256(password.encode()).hexdigest()
+                    != self.meta.password_hash):
+                raise ValueError('Неверный пароль.')
+
+        if isinstance(self.archived_data, list):
+            self._decode_files()
+        else:
+            self._decode_directory()
+
+    def _decode_files(self) -> None:
+        for file in self.archived_data:
+            decode_file(file, self.output_path)
+
+    def _decode_directory(
+            self,
+            directory: Optional[Directory] = None,
+            path: Optional[str] = None) -> None:
+        if path is None:
+            path = f'{self.output_path}/{self.archived_data.name}'
+
+        if directory is None:
+            directory = self.archived_data
+
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+        for file in directory.files:
+            decode_file(file, path)
+
+        for dir in directory.directories:
+            self._decode_directory(dir, f'{path}/{dir.name}')
+
+    @property
+    def file_listings(self) -> str:
+        if isinstance(self.archived_data, list):
+            return '\n'.join([file.name for file in self.meta.file_model])
+        else:
+            return str(self.archived_data)
 
 
-class Archiver:
-    def __init__(self, path: str) -> None:
-        self.name = os.path.basename(path)
-        self.file_size = os.path.getsize(path)
+class Encoder:
+    def __init__(self, *input_paths: str,
+                 output_path: Optional[str] = None,
+                 password: Optional[str] = None) -> None:
+        if os.path.isdir(input_paths[0]):
+            self.model = get_directory(input_paths[0])
+        else:
+            self.model = get_files(*input_paths)
 
-        try:
-            with open(path, 'rb') as file:
-                self.bytes = file.read()
-        except FileNotFoundError:
-            logging.error(f'Файл {path} не найден.')
-            raise FileNotFoundError
+        self.model = MetaWrapper(self.model, password)
+        self.output_path = (f'{self.model.name}.sf' if not output_path
+                            else f'{output_path}/{self.model.name}.sf')
 
-        self.hash = hashlib.md5(self.bytes).hexdigest()
-
-        self.shannon_fano = ShannonFano(self.bytes)
-
-    def _get_file(self) -> File:
-        encoded = self.shannon_fano.encode()
-        encoded_bytes = bytes()
-        for i in range(0, len(encoded), 8):
-            encoded_bytes += int(encoded[i:i + 8], 2).to_bytes(1, 'big')
-        return File(name=self.name,
-                    decoding_table=self.shannon_fano.codes,
-                    encoded=encoded_bytes,
-                    hash=self.hash,
-                    encoded_size=len(encoded))
-
-    def encode(self, output_path: str = None) -> None:
-        file = self._get_file()
-
-        path = f'{file.name}.sf' if output_path is None \
-            else f'{output_path}/{file.name}.sf'
-        with open(path, 'wb') as f:
-            f.write(pickle.dumps(file))
-        encoded_file_size = os.path.getsize(path)
-        logging.info('Запись в архив завершена.')
-        logging.info(f'Размер файла до сжатия {self.file_size} bytes')
-        logging.info(f'Размер файла после сжатия {encoded_file_size} bytes')
-        logging.info(f'Процент сжатия составил '
-                     f'{100 * (1 - encoded_file_size // self.file_size)}%')
-        logging.info(f'Конечный путь: {path}')
-
-
-if __name__ == '__main__':
-    archiver = Archiver('test.txt')
-    archiver.encode()
-    decode('test.txt.sf')
+    def encode(self) -> None:
+        with open(self.output_path, 'wb') as f:
+            f.write(pickle.dumps(self.model))
