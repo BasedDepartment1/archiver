@@ -1,8 +1,5 @@
 import os
-import logging
-import hashlib
 
-from shannon_fano import ShannonFano
 from file_models import File, Directory, List
 
 
@@ -20,7 +17,6 @@ def get_files(*paths: str) -> List:
     try:
         return [get_file(path) for path in paths]
     except FileNotFoundError:
-        logging.error('Файл не найден.')
         raise FileNotFoundError
 
 

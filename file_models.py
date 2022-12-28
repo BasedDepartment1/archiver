@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pickle
-import logging
 import hashlib
 import os
 
@@ -18,10 +17,8 @@ def load_from_pickle(path: str) -> MetaWrapper:
         with open(path, 'rb') as f:
             return pickle.load(f)
     except FileNotFoundError:
-        logging.error(f'Файл {path} не найден.')
         raise
     except pickle.UnpicklingError:
-        logging.error(f'Файл {path} поврежден.')
         raise
 
 
@@ -41,8 +38,7 @@ class File:
             with open(path, 'rb') as file:
                 bts = file.read()
         except FileNotFoundError:
-            logging.error(f'Файл {path} не найден.')
-            raise FileNotFoundError
+            raise
 
         hash_code = hashlib.md5(bts).hexdigest()
         shannon_fano = ShannonFano(bts)
