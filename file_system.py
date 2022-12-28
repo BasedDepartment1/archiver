@@ -16,7 +16,7 @@ def get_directory(path: str) -> Directory:
     return root_dir
 
 
-def get_files(*paths: str) -> List[File]:
+def get_files(*paths: str) -> List:
     try:
         return [get_file(path) for path in paths]
     except FileNotFoundError:
@@ -50,8 +50,10 @@ class FileSerializer:
         encoded_bytes = bytes()
         for i in range(0, len(encoded), 8):
             encoded_bytes += int(encoded[i:i + 8], 2).to_bytes(1, 'big')
-        return File(name=self.name,
-                    decoding_table=self.shannon_fano.codes,
-                    encoded=encoded_bytes,
-                    hash=self.hash,
-                    encoded_size=len(encoded))
+        return File(
+            name=self.name,
+            decoding_table=self.shannon_fano.codes,
+            encoded=encoded_bytes,
+            hash=self.hash,
+            encoded_size=len(encoded)
+        )
