@@ -43,17 +43,21 @@ class Decoder:
         self.meta = load_from_pickle(input_path)
         self.archived_data = self.meta.file_model
 
-    def decode(self) -> None:
-        if self.meta.password_hash:
-            password = input('Введите пароль: ')
-            if (hashlib.sha256(password.encode()).hexdigest()
-                    != self.meta.password_hash):
-                raise ValueError('Неверный пароль.')
-
+    def decode(self, password: Optional[str] = None) -> None:
+        self._validate_password(password)
         if isinstance(self.archived_data, list):
             self._decode_files()
         else:
             self._decode_directory()
+
+    def _validate_password(self, password: Optional[str]) -> None:
+        if self.meta.password_hash:
+            if not password:
+                raise PermissionError('Those files are password protected.')
+
+            if (hashlib.sha256(password.encode()).hexdigest()
+                    != self.meta.password_hash):
+                raise ValueError('Неверный пароль.')
 
     def _decode_files(self) -> None:
         for file in self.archived_data:
